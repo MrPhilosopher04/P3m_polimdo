@@ -1,25 +1,38 @@
 const express = require('express');
 const proposalController = require('../controllers/proposal.controller');
-const { verifyToken, checkRole } = require('../middlewares/auth');
-
+const { verifyToken, checkRole } = require('../middlewares/auth'); // ✅ Path yang benar
 const router = express.Router();
 
-// Semua route wajib verifikasi token dulu
+// Semua route memerlukan autentikasi
 router.use(verifyToken);
 
+// GET /proposals - Berdasarkan role
 router.get('/', proposalController.getAll);
-router.get('/mine', proposalController.getMine); // Pastikan fungsi ini ada di controller
+
+// GET /proposals/:id - Detail proposal
 router.get('/:id', proposalController.getById);
 
-// Hanya user dengan role DOSEN atau ADMIN yang boleh create, update, submit, delete
-router.post('/', checkRole('DOSEN', 'ADMIN'), proposalController.create);
-router.put('/:id', checkRole('DOSEN', 'ADMIN'), proposalController.update);
-router.post('/:id/submit', checkRole('DOSEN', 'ADMIN'), proposalController.submit);
+// ✅ POST /proposals - Create (DOSEN, MAHASISWA, ADMIN)
+router.post(
+  '/',
+  checkRole('DOSEN', 'MAHASISWA', 'ADMIN'), // ✅ Benar: arguments terpisah
+  proposalController.create
+);
 
-// Upload dokumen tetap langsung ke controller, karena di controller sudah menangani middleware upload
-router.post('/:id/upload', proposalController.uploadDocument);
+// PUT /proposals/:id - Update proposal
+router.put('/:id', proposalController.update);
 
-// Delete juga dibatasi role DOSEN dan ADMIN
-router.delete('/:id', checkRole('DOSEN', 'ADMIN'), proposalController.delete);
+// POST /proposals/:id/submit - Submit proposal
+router.post('/:id/submit', proposalController.submit);
+
+// ✅ PATCH /proposals/:id/status - Update status (ADMIN, REVIEWER)
+router.patch(
+  '/:id/status',
+  checkRole('ADMIN', 'REVIEWER'), // ✅ Benar: arguments terpisah
+  proposalController.updateStatus
+);
+
+// DELETE /proposals/:id - Delete proposal
+router.delete('/:id', proposalController.delete);
 
 module.exports = router;

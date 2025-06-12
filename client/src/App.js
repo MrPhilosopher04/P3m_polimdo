@@ -1,102 +1,333 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
+import { ToastProvider } from './context/ToastContext';
 
-// Pages
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+import Layout from './components/Layout/Layout';
+
+// Auth Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Proposals from './pages/Proposals';
-import Reviews from './pages/Reviews';
-import Skema from './pages/Skema';
-import Users from './pages/Users';
-import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 
+// Profile
+import Profile from './pages/Users/Profile';
+
+// Dashboards
+import RoleBasedDashboard from './pages/Dashboard/RoleBasedDashboard';
+
+// Proposal Pages
+import ProposalsPage from './pages/Proposals';
+import CreateProposalPage from './pages/Proposals/Create';
+import ProposalDetailPage from './pages/Proposals/Detail';
+import EditProposalPage from './pages/Proposals/Edit';
+
+// Reviews and Users
+import Reviews from './pages/Reviews';
+import Users from './pages/Users';
+
+// Skema Pages
+import SkemaIndex from './pages/Skema';
+import SkemaDetail from './pages/Skema/Detail';
+import SkemaCreate from './pages/Skema/Create';
+import SkemaEdit from './pages/Skema/Edit';
+
+// Jurusan Pages
+import JurusanIndex from './pages/Jurusan';
+import JurusanDetail from './pages/Jurusan/Detail';
+import JurusanCreate from './pages/Jurusan/Create';
+import JurusanEdit from './pages/Jurusan/Edit';
+
+// Prodi Pages
+import ProdiIndex from './pages/Prodi';
+import ProdiDetail from './pages/Prodi/Detail';
+import ProdiCreate from './pages/Prodi/Create';
+import ProdiEdit from './pages/Prodi/Edit';
+
 // Styles
-import './styles/index.css';
-import './styles/App.css';
-import './styles/auth.css';
-import './styles/layout.css';
-import './styles/components.css';
-import './styles/dashboard.css';
-import './styles/footer.css';
-import './components/Dashboard/StatsCard';
+import './styles/tailwind.css';
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="App">
+      <ToastProvider>
+        <Router>
           <Routes>
-            {/* Public Routes */}
+            {/* ✅ Public Routes - Harus didefinisikan PERTAMA dan TERPISAH */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
-            {/* Protected Routes */}
-            <Route 
-              path="/dashboard" 
+            {/* ✅ Protected Routes with Layout - Gunakan path="/*" bukan path="/" */}
+            <Route
+              path="/*"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Layout />
                 </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/proposals" 
-              element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'DOSEN', 'MAHASISWA']}>
-                  <Proposals />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/reviews" 
-              element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'REVIEWER', 'DOSEN']}>
-                  <Reviews />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/skema" 
-              element={
-                <ProtectedRoute allowedRoles={['ADMIN']}>
-                  <Skema />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/users" 
-              element={
-                <ProtectedRoute allowedRoles={['ADMIN']}>
-                  <Users />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Default Route */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            {/* 404 Route */}
+              }
+            >
+              {/* Redirect root to dashboard */}
+              <Route path="" element={<Navigate to="/dashboard" replace />} />
+              
+              {/* Dashboard */}
+              <Route path="dashboard" element={<RoleBasedDashboard />} />
+
+              {/* Profile */}
+              <Route path="profile" element={<Profile />} />
+
+              {/* Mahasiswa Routes */}
+              <Route path="mahasiswa">
+                <Route
+                  path="dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['MAHASISWA']}>
+                      <RoleBasedDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="proposals"
+                  element={
+                    <ProtectedRoute allowedRoles={['MAHASISWA']}>
+                      <ProposalsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="proposals/create"
+                  element={
+                    <ProtectedRoute allowedRoles={['MAHASISWA']}>
+                      <CreateProposalPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="skema"
+                  element={
+                    <ProtectedRoute allowedRoles={['MAHASISWA']}>
+                      <SkemaIndex />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* Dosen Routes */}
+              <Route path="dosen">
+                <Route
+                  path="dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['DOSEN']}>
+                      <RoleBasedDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="proposals"
+                  element={
+                    <ProtectedRoute allowedRoles={['DOSEN']}>
+                      <ProposalsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="proposals/create"
+                  element={
+                    <ProtectedRoute allowedRoles={['DOSEN']}>
+                      <CreateProposalPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* Admin Routes */}
+              <Route path="admin">
+                <Route
+                  path="dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <RoleBasedDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="users/*"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <Users />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="skema"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <SkemaIndex />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="jurusan"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <JurusanIndex />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="prodi"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <ProdiIndex />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* General Skema Routes */}
+              <Route
+                path="skema/create"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'MAHASISWA']}>
+                    <SkemaCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="skema/:id"
+                element={
+                  <ProtectedRoute>
+                    <SkemaDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="skema/:id/edit"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'MAHASISWA']}>
+                    <SkemaEdit />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* General Proposals Routes */}
+              <Route
+                path="proposals"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'DOSEN', 'MAHASISWA']}>
+                    <ProposalsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="proposals/create"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'DOSEN', 'MAHASISWA']}>
+                    <CreateProposalPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="proposals/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'DOSEN', 'MAHASISWA', 'REVIEWER']}>
+                    <ProposalDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="proposals/:id/edit"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'DOSEN', 'MAHASISWA']}>
+                    <EditProposalPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Reviews */}
+              <Route
+                path="reviews/*"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'REVIEWER', 'DOSEN', 'MAHASISWA']}>
+                    <Reviews />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Jurusan Routes */}
+              <Route
+                path="jurusan"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <JurusanIndex />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="jurusan/create"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <JurusanCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="jurusan/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <JurusanDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="jurusan/:id/edit"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <JurusanEdit />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Prodi Routes */}
+              <Route
+                path="prodi"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <ProdiIndex />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="prodi/create"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <ProdiCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="prodi/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <ProdiDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="prodi/:id/edit"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <ProdiEdit />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+
+            {/* 404 - Harus di akhir */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </div>
-      </Router>
+        </Router>
+      </ToastProvider>
     </AuthProvider>
   );
 }

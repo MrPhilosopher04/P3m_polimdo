@@ -1,100 +1,61 @@
-// src/components/Layout/Sidebar.js
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  Home,
+  FileText,
+  Users,
+  LayoutDashboard,
+  User,
+  Layers,
+  BookOpen,
+  GraduationCap // Tambahkan icon baru
+} from 'lucide-react';
 
-const Sidebar = () => {
-  const { user, hasRole, hasAnyRole } = useAuth();
+const Sidebar = ({ role }) => {
+  const { pathname } = useLocation();
+  const roleUpper = role?.toUpperCase() || '';
 
-  const menuItems = [
-    {
-      path: '/dashboard',
-      label: 'Dashboard',
-      icon: '📊',
-      roles: ['admin', 'dosen', 'mahasiswa', 'reviewer']
-    },
-    {
-      path: '/proposals',
-      label: 'Proposal',
-      icon: '📝',
-      roles: ['admin', 'dosen', 'mahasiswa']
-    },
-    {
-      path: '/reviews',
-      label: 'Review',
-      icon: '📋',
-      roles: ['admin', 'dosen', 'reviewer']
-    },
-    {
-      path: '/skema',
-      label: 'Skema',
-      icon: '⚙️',
-      roles: ['admin']
-    },
-    {
-      path: '/users',
-      label: 'Pengguna',
-      icon: '👥',
-      roles: ['admin']
-    }
-  ];
-
-  // Safely check if hasAnyRole exists and is a function
-  const filteredMenuItems = menuItems.filter(item => {
-    if (hasAnyRole && typeof hasAnyRole === 'function') {
-      return hasAnyRole(item.roles);
-    }
-    // Fallback: check if user role is in the allowed roles
-    return item.roles.includes(user?.role);
-  });
-
-  const getUserRoleLabel = (role) => {
-    const roleLabels = {
-      admin: 'Administrator',
-      dosen: 'Dosen',
-      mahasiswa: 'Mahasiswa',
-      reviewer: 'Reviewer'
-    };
-    return roleLabels[role] || role || 'Unknown';
+  const NavItem = ({ to, icon: Icon, label }) => {
+    const isActive = pathname.startsWith(to);
+    return (
+      <Link
+        to={to}
+        aria-current={isActive ? 'page' : undefined}
+        className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition 
+          ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+      >
+        <Icon className="w-5 h-5" />
+        {label}
+      </Link>
+    );
   };
 
   return (
-    <aside className="sidebar" role="navigation" aria-label="Main navigation">
-      <nav className="sidebar-nav">
-        <ul className="nav-list" role="list">
-          {filteredMenuItems.map((item) => (
-            <li key={item.path} className="nav-item" role="listitem">
-              <NavLink
-                to={item.path}
-                className={({ isActive }) => 
-                  `nav-link ${isActive ? 'active' : ''}`
-                }
-                aria-label={item.label}
-              >
-                <span className="nav-icon" role="img" aria-label={item.label}>
-                  {item.icon}
-                </span>
-                <span className="nav-text">{item.label}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-        
-        <div className="sidebar-footer">
-          <div className="user-info-sidebar">
-            <div className="user-avatar">
-              <span role="img" aria-label="user avatar">👤</span>
-            </div>
-            <div className="user-details">
-              <span className="user-name" title={user?.name}>
-                {user?.name || 'User'}
-              </span>
-              <span className="user-role" title={getUserRoleLabel(user?.role)}>
-                {getUserRoleLabel(user?.role)}
-              </span>
-            </div>
-          </div>
-        </div>
+    <aside className="w-64 min-h-screen bg-white border-r shadow-sm">
+      <div className="p-6 text-center font-bold text-xl text-blue-600 border-b">
+        P3M Polimdo
+      </div>
+
+      <nav className="p-4 space-y-1">
+        <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+
+        {(roleUpper === 'ADMIN' || roleUpper === 'DOSEN' || roleUpper === 'MAHASISWA') && (
+          <NavItem to="/proposals" icon={FileText} label="Proposals" />
+        )}
+
+        {(roleUpper === 'ADMIN' || roleUpper === 'REVIEWER' || roleUpper === 'DOSEN' || roleUpper === 'MAHASISWA') && (
+          <NavItem to="/reviews" icon={Layers} label="Reviews" />
+        )}
+
+        {roleUpper === 'ADMIN' && (
+          <>
+            <NavItem to="/admin/skema" icon={Layers} label="Skema" />
+            <NavItem to="/admin/users" icon={Users} label="Users" />
+            {/* Tambahkan menu untuk Jurusan dan Prodi */}
+            <NavItem to="/admin/jurusan" icon={BookOpen} label="Jurusan" />
+            <NavItem to="/admin/prodi" icon={GraduationCap} label="Prodi" />
+          </>
+        )}
       </nav>
     </aside>
   );

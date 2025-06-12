@@ -1,4 +1,3 @@
-// src/context/AuthContext.js - DIPERBAIKI
 import React, { createContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 
@@ -8,6 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
 
   useEffect(() => {
     checkAuthStatus();
@@ -15,21 +15,18 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        // PERBAIKAN: Gunakan endpoint profile untuk verify token
-        const response = await authService.getProfile();
-        if (response.success) {
-          setUser(response.data.user);
-        } else {
-          localStorage.removeItem('token');
-          setUser(null);
-        }
+      if (!token) return setLoading(false);
+
+      const response = await authService.verifyToken(token);
+
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+      } else {
+        logout();
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      localStorage.removeItem('token');
-      setUser(null);
+      logout();
     } finally {
       setLoading(false);
     }
@@ -39,11 +36,12 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
+
       const response = await authService.login(credentials);
-      
-      // PERBAIKAN: Periksa response.success bukan response.data.success
-      if (response.success) {
+
+      if (response.success && response.data?.token) {
         localStorage.setItem('token', response.data.token);
+        setToken(response.data.token);
         setUser(response.data.user);
         return { success: true, user: response.data.user };
       } else {
@@ -53,7 +51,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error.message || 'Login gagal';
+      const errorMessage = error?.message || 'Login gagal';
       setError(errorMessage);
       return { success: false, message: errorMessage };
     } finally {
@@ -65,8 +63,9 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
+
       const response = await authService.register(userData);
-      
+
       if (response.success) {
         return { success: true, message: 'Registrasi berhasil! Silakan login.' };
       } else {
@@ -74,7 +73,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: response.message };
       }
     } catch (error) {
-      const errorMessage = error.message || 'Registrasi gagal';
+      const errorMessage = error?.message || 'Registrasi gagal';
       setError(errorMessage);
       return { success: false, message: errorMessage };
     } finally {
@@ -84,29 +83,32 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    setToken(null);
     setUser(null);
     setError(null);
   };
 
-  const hasRole = (role) => {
-    return user && user.role === role;
+  // ✅ Tambahkan method updateUser
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
   };
 
-  const hasAnyRole = (roles) => {
-    return user && roles.includes(user.role);
-  };
+  const hasRole = (role) => user?.role === role;
+  const hasAnyRole = (roles) => roles.includes(user?.role);
 
   const value = {
     user,
     loading,
     error,
+    token,
     login,
     register,
     logout,
+    updateUser, // Tambahan
     hasRole,
     hasAnyRole,
     isAuthenticated: !!user,
-    setError
+    setError,
   };
 
   return (

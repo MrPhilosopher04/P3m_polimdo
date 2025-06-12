@@ -31,8 +31,13 @@ const generateToken = (payload, expiresIn = '24h') => {
  * Verify JWT token
  */
 const verifyToken = (token) => {
-  return jwt.verify(token, process.env.JWT_SECRET);
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    return null; // atau throw error yang lebih informatif
+  }
 };
+
 
 /**
  * Pagination helper

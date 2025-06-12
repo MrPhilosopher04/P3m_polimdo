@@ -1,243 +1,154 @@
-const { PrismaClient } = require('@prisma/client');
-
+const { PrismaClient, Status } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { sendResponse, sendError } = require('../utils/response');
 
 const pengumumanController = {
-  // Get all pengumuman
+  // [GET] /api/pengumuman
   getAll: async (req, res) => {
     try {
-      const { kategori, status = 'AKTIF', page = 1, limit = 10, search } = req.query;
-      const offset = (page - 1) * limit;
+      const { page = 1, limit = 10, search = '', status, kategori } = req.query;
 
-      const where = { status };
-      if (kategori) where.kategori = kategori;
-      if (search) {
-        where.OR = [
-          { judul: { contains: search } },
-          { konten: { contains: search } }
-        ];
-      }
+      const pageInt = Math.max(parseInt(page), 1);
+      const limitInt = Math.max(parseInt(limit), 1);
+      const skip = (pageInt - 1) * limitInt;
 
-      const [pengumumans, total] = await Promise.all([
+      const where = {
+        ...(status ? { status } : {}),
+        ...(kategori ? { kategori } : {}),
+        ...(search ? {
+          OR: [
+            { judul: { contains: search, mode: 'insensitive' } },
+            { konten: { contains: search, mode: 'insensitive' } }
+          ]
+        } : {})
+      };
+
+      const [items, total] = await Promise.all([
         prisma.pengumuman.findMany({
           where,
-          orderBy: [
-            { prioritas: 'desc' },
-            { createdAt: 'desc' }
-          ],
-          skip: offset,
-          take: parseInt(limit)
+          skip,
+          take: limitInt,
+          orderBy: { createdAt: 'desc' },
         }),
-        prisma.pengumuman.count({ where })
+        prisma.pengumuman.count({ where }),
       ]);
 
-      res.json({
-        success: true,
-        data: {
-          pengumumans,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
-          }
+      sendResponse(res, 'Data pengumuman berhasil diambil', {
+        data: items,
+        pagination: {
+          page: pageInt,
+          limit: limitInt,
+          total,
+          pages: Math.ceil(total / limitInt),
         }
       });
 
-    } catch (error) {
-      console.error('Get pengumuman error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+    } catch (err) {
+      console.error(err);
+      sendError(res, 'Gagal mengambil data', 500);
     }
   },
 
-  // Get pengumuman by ID
+  // [GET] /api/pengumuman/:id
   getById: async (req, res) => {
     try {
       const { id } = req.params;
-
       const pengumuman = await prisma.pengumuman.findUnique({
         where: { id: parseInt(id) }
       });
 
-      if (!pengumuman) {
-        return res.status(404).json({
-          success: false,
-          message: 'Pengumuman not found'
-        });
-      }
+      if (!pengumuman) return sendError(res, 'Pengumuman tidak ditemukan', 404);
 
-      res.json({
-        success: true,
-        data: { pengumuman }
-      });
-
-    } catch (error) {
-      console.error('Get pengumuman by ID error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      sendResponse(res, 'Detail pengumuman ditemukan', { pengumuman });
+    } catch (err) {
+      console.error(err);
+      sendError(res, 'Gagal mengambil data', 500);
     }
   },
 
-  // Create pengumuman (Admin only)
+  // [POST] /api/pengumuman
   create: async (req, res) => {
     try {
-      const { judul, konten, kategori, prioritas = 'normal' } = req.body;
+      const { judul, konten, kategori } = req.body;
 
-      // Validation
       if (!judul || !konten || !kategori) {
-        return res.status(400).json({
-          success: false,
-          message: 'Judul, konten, dan kategori wajib diisi'
-        });
+        return sendError(res, 'Semua field wajib diisi', 400);
       }
 
-      const pengumuman = await prisma.pengumuman.create({
+      const newItem = await prisma.pengumuman.create({
         data: {
           judul,
           konten,
           kategori,
-          prioritas,
-          createdBy: req.user.id
+          status: Status.AKTIF,
         }
       });
 
-      res.status(201).json({
-        success: true,
-        message: 'Pengumuman created successfully',
-        data: { pengumuman }
-      });
-
-    } catch (error) {
-      console.error('Create pengumuman error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      sendResponse(res, 'Pengumuman berhasil dibuat', { pengumuman: newItem }, 201);
+    } catch (err) {
+      console.error(err);
+      sendError(res, 'Gagal membuat pengumuman', 500);
     }
   },
 
-  // Update pengumuman (Admin only)
+  // [PUT] /api/pengumuman/:id
   update: async (req, res) => {
     try {
       const { id } = req.params;
-      const { judul, konten, kategori, prioritas, status } = req.body;
+      const { judul, konten, kategori, status } = req.body;
 
-      const existingPengumuman = await prisma.pengumuman.findUnique({
-        where: { id: parseInt(id) }
-      });
+      const data = { judul, konten, kategori, status };
 
-      if (!existingPengumuman) {
-        return res.status(404).json({
-          success: false,
-          message: 'Pengumuman not found'
-        });
-      }
-
-      const updateData = {};
-      if (judul !== undefined) updateData.judul = judul;
-      if (konten !== undefined) updateData.konten = konten;
-      if (kategori !== undefined) updateData.kategori = kategori;
-      if (prioritas !== undefined) updateData.prioritas = prioritas;
-      if (status !== undefined) updateData.status = status;
-
-      const pengumuman = await prisma.pengumuman.update({
+      const updated = await prisma.pengumuman.update({
         where: { id: parseInt(id) },
-        data: updateData
+        data,
       });
 
-      res.json({
-        success: true,
-        message: 'Pengumuman updated successfully',
-        data: { pengumuman }
-      });
-
-    } catch (error) {
-      console.error('Update pengumuman error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      sendResponse(res, 'Pengumuman berhasil diupdate', { pengumuman: updated });
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'P2025') return sendError(res, 'Pengumuman tidak ditemukan', 404);
+      sendError(res, 'Gagal mengupdate', 500);
     }
   },
 
-  // Delete pengumuman (Admin only)
+  // [DELETE] /api/pengumuman/:id
   delete: async (req, res) => {
     try {
       const { id } = req.params;
 
-      const existingPengumuman = await prisma.pengumuman.findUnique({
-        where: { id: parseInt(id) }
-      });
+      await prisma.pengumuman.delete({ where: { id: parseInt(id) } });
 
-      if (!existingPengumuman) {
-        return res.status(404).json({
-          success: false,
-          message: 'Pengumuman not found'
-        });
-      }
-
-      await prisma.pengumuman.delete({
-        where: { id: parseInt(id) }
-      });
-
-      res.json({
-        success: true,
-        message: 'Pengumuman deleted successfully'
-      });
-
-    } catch (error) {
-      console.error('Delete pengumuman error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      sendResponse(res, 'Pengumuman berhasil dihapus');
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'P2025') return sendError(res, 'Pengumuman tidak ditemukan', 404);
+      sendError(res, 'Gagal menghapus', 500);
     }
   },
 
-  // Update status pengumuman (Admin only)
+  // [PATCH] /api/pengumuman/:id/status
   updateStatus: async (req, res) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
 
-      if (!['AKTIF', 'NONAKTIF'].includes(status)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Status harus AKTIF atau NONAKTIF'
-        });
+      if (!Object.values(Status).includes(status)) {
+        return sendError(res, 'Status tidak valid', 400);
       }
 
-      const pengumuman = await prisma.pengumuman.update({
+      const updated = await prisma.pengumuman.update({
         where: { id: parseInt(id) },
-        data: { status }
+        data: { status },
       });
 
-      res.json({
-        success: true,
-        message: 'Status pengumuman updated successfully',
-        data: { pengumuman }
-      });
-
-    } catch (error) {
-      if (error.code === 'P2025') {
-        return res.status(404).json({
-          success: false,
-          message: 'Pengumuman not found'
-        });
-      }
-      
-      console.error('Update status pengumuman error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      sendResponse(res, 'Status berhasil diperbarui', { pengumuman: updated });
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'P2025') return sendError(res, 'Pengumuman tidak ditemukan', 404);
+      sendError(res, 'Gagal mengupdate status', 500);
     }
-  }
+  },
 };
 
 module.exports = pengumumanController;

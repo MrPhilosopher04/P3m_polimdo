@@ -11,27 +11,51 @@ datasource db {
 
 model User {
   id               Int       @id @default(autoincrement())
-  nip              String?   @unique // Untuk dosen, admin, reviewer
-  nim              String?   @unique // Untuk mahasiswa
+  nip              String?   @unique
+  nim              String?   @unique
   nama             String
   email            String    @unique
   password         String
   role             UserRole
   no_telp          String?
-  bidang_keahlian  String?   // Untuk dosen dan reviewer
-  institusi        String?   // Untuk reviewer eksternal
-  jurusan          String?   // Untuk mahasiswa
+  bidang_keahlian  String?
+  jurusanId        Int?
+  prodiId          Int?
   status           Status    @default(AKTIF)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   // Relations
-  proposals         Proposal[]         @relation("ProposalKetua")
-  reviewedProposals Proposal[]         @relation("ProposalReviewer")
-  proposalMembers   ProposalMember[]
-  reviews           Review[]
+  jurusan          Jurusan?   @relation(fields: [jurusanId], references: [id])
+  prodi            Prodi?     @relation(fields: [prodiId], references: [id])
+  proposals        Proposal[]         @relation("ProposalKetua")
+  reviewedProposals Proposal[]        @relation("ProposalReviewer")
+  proposalMembers  ProposalMember[]
+  reviews          Review[]
 
   @@map("users")
+}
+
+model Jurusan {
+  id      Int     @id @default(autoincrement())
+  nama    String  @unique
+  prodis  Prodi[]
+  users   User[]
+
+  @@map("jurusan")
+}
+
+model Prodi {
+  id         Int     @id @default(autoincrement())
+  nama       String
+  jurusanId  Int
+
+  // Relations
+  jurusan Jurusan @relation(fields: [jurusanId], references: [id])
+  users   User[]
+
+  @@unique([nama, jurusanId])
+  @@map("prodi")
 }
 
 model Skema {
@@ -69,6 +93,7 @@ model Proposal {
   tanggal_submit   DateTime?
   reviewerId       Int?
   catatan_reviewer String?        @db.Text
+  tanggal_review   DateTime?      // FIELD YANG DITAMBAHKAN
   skor_akhir       Decimal?       @db.Decimal(5, 2)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -79,6 +104,7 @@ model Proposal {
   reviewer  User?              @relation("ProposalReviewer", fields: [reviewerId], references: [id])
   members   ProposalMember[]
   reviews   Review[]
+  documents Document[]
 
   @@map("proposals")
 }
@@ -87,7 +113,7 @@ model ProposalMember {
   id         Int      @id @default(autoincrement())
   proposalId Int
   userId     Int
-  peran      String   // "ANGGOTA", "CO_KETUA"
+  peran      String
   createdAt  DateTime @default(now())
 
   // Relations
@@ -125,6 +151,19 @@ model Pengumuman {
   updatedAt DateTime @updatedAt
 
   @@map("pengumuman")
+}
+
+model Document {
+  id         Int      @id @default(autoincrement())
+  name       String
+  url        String
+  proposalId Int
+  uploadedAt DateTime @default(now())
+
+  // Relations
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
 }
 
 // ==================== ENUMS ====================

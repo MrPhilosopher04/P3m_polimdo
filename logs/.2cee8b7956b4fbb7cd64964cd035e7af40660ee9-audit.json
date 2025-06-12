@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 90
+    },
+    "auditLog": "D:\\TUGAS-TUGAS MATA KULIAH SEMESTER 6\\PRAK.TEKNOLOGI WEB\\Web P3M Polimdo(error)\\WebP3mPolimdo\\logs\\.2cee8b7956b4fbb7cd64964cd035e7af40660ee9-audit.json",
+    "files": [
+        {
+            "date": 1749063190795,
+            "name": "D:\\TUGAS-TUGAS MATA KULIAH SEMESTER 6\\PRAK.TEKNOLOGI WEB\\Web P3M Polimdo(error)\\WebP3mPolimdo\\logs\\error-2025-06-05.log",
+            "hash": "c89f0dbc2394e410b0c0ce1644fc8679e7dcb2034722f1b28f105dc8cad53983"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -1,9 +1,10 @@
-// Role pengguna
+// server/utils/constants.js
+// Role pengguna (sesuai dengan Prisma schema)
 const USER_ROLES = {
   ADMIN: 'ADMIN',
-  REVIEWER: 'REVIEWER',
   DOSEN: 'DOSEN',
   MAHASISWA: 'MAHASISWA',
+  REVIEWER: 'REVIEWER'
 };
 
 // Status pengguna
@@ -20,14 +21,14 @@ const PROPOSAL_STATUS = {
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   REVISION: 'REVISION',
-  COMPLETED: 'COMPLETED',
+  COMPLETED: 'COMPLETED'
 };
 
 // Rekomendasi hasil review
 const REKOMENDASI = {
   LAYAK: 'LAYAK',
   TIDAK_LAYAK: 'TIDAK_LAYAK',
-  REVISI: 'REVISI',
+  REVISI: 'REVISI'
 };
 
 // Kategori proposal
@@ -35,22 +36,7 @@ const KATEGORI = {
   PENELITIAN: 'PENELITIAN',
   PENGABDIAN: 'PENGABDIAN',
   HIBAH_INTERNAL: 'HIBAH_INTERNAL',
-  HIBAH_EKSTERNAL: 'HIBAH_EKSTERNAL',
-};
-
-// Jenis dokumen
-const DOCUMENT_TYPES = {
-  PROPOSAL: 'PROPOSAL',
-  LAPORAN: 'LAPORAN',
-  REVISI: 'REVISI',
-  LAINNYA: 'LAINNYA'
-};
-
-// Peran anggota proposal
-const MEMBER_ROLES = {
-  KETUA: 'KETUA',
-  ANGGOTA: 'ANGGOTA',
-  REVIEWER: 'REVIEWER'
+  HIBAH_EKSTERNAL: 'HIBAH_EKSTERNAL'
 };
 
 // Label tampilan untuk role
@@ -58,7 +44,7 @@ const ROLE_LABELS = {
   [USER_ROLES.ADMIN]: 'Administrator',
   [USER_ROLES.REVIEWER]: 'Reviewer',
   [USER_ROLES.DOSEN]: 'Dosen',
-  [USER_ROLES.MAHASISWA]: 'Mahasiswa',
+  [USER_ROLES.MAHASISWA]: 'Mahasiswa'
 };
 
 // Status aktif/nonaktif
@@ -75,7 +61,7 @@ const PROPOSAL_STATUS_LABELS = {
   [PROPOSAL_STATUS.APPROVED]: 'Disetujui',
   [PROPOSAL_STATUS.REJECTED]: 'Ditolak',
   [PROPOSAL_STATUS.REVISION]: 'Perlu Revisi',
-  [PROPOSAL_STATUS.COMPLETED]: 'Selesai',
+  [PROPOSAL_STATUS.COMPLETED]: 'Selesai'
 };
 
 // Label rekomendasi
@@ -91,8 +77,6 @@ module.exports = {
   PROPOSAL_STATUS,
   REKOMENDASI,
   KATEGORI,
-  DOCUMENT_TYPES,
-  MEMBER_ROLES,
   ROLE_LABELS,
   STATUS_LABELS,
   PROPOSAL_STATUS_LABELS,

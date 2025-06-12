@@ -1,3 +1,39 @@
-node_modules
-# Keep environment variables out of version control
+# Dependencies
+node_modules/
+
+# Environment
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Uploaded files (jangan pernah commit upload user)
+uploads/
+uploads/**
+*.pdf
+*.jpg
+*.png
+
+# Logs
+logs/
+*.log
+
+# IDE/editor settings
+.vscode/
+.idea/
+.DS_Store
+
+# Test coverage
+coverage/
+
+# Build or temp files (jika ada)
+temp/
+*.tmp
+
+# Prisma files (opsional)
+prisma/migrations/
+
+# Ignore database if accidentally committed
+*.sqlite
+*.db

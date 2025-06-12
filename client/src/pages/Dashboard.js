@@ -1,211 +1,166 @@
 // src/pages/Dashboard.js
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { dashboardService } from '../services/dashboardService';
 import StatsCard from '../components/Dashboard/StatsCard';
+import RecentItems from '../components/Dashboard/RecentItems';
+import QuickActions from '../components/Dashboard/QuickActions';
+import Loading from '../components/Common/Loading';
+import AlertMessage from '../components/Common/AlertMessage';
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleLogout = () => {
-    if (logout) {
-      logout();
-    }
-  };
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Add timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          throw new Error('Request timeout - Server tidak merespons');
+        }, 10000); // 10 second timeout
 
-  const getDashboardStats = () => {
-    switch (user?.role) {
-      case 'admin':
-        return [
-          { title: 'Total Users', value: '150', icon: '👥', color: 'blue' },
-          { title: 'Total Proposals', value: '45', icon: '📝', color: 'green' },
-          { title: 'Pending Reviews', value: '12', icon: '⏳', color: 'orange' },
-          { title: 'Active Skema', value: '8', icon: '⚙️', color: 'purple' }
-        ];
-      
-      case 'dosen':
-        return [
-          { title: 'My Proposals', value: '5', icon: '📝', color: 'blue' },
-          { title: 'Reviews Assigned', value: '3', icon: '📋', color: 'orange' },
-          { title: 'Completed Projects', value: '8', icon: '✅', color: 'green' }
-        ];
-      
-      case 'mahasiswa':
-        return [
-          { title: 'My Proposals', value: '2', icon: '📝', color: 'blue' },
-          { title: 'Approved', value: '1', icon: '✅', color: 'green' },
-          { title: 'In Review', value: '1', icon: '⏳', color: 'orange' }
-        ];
-      
-      case 'reviewer':
-        return [
-          { title: 'Assigned Reviews', value: '7', icon: '📋', color: 'orange' },
-          { title: 'Completed Reviews', value: '15', icon: '✅', color: 'green' },
-          { title: 'Pending Reviews', value: '3', icon: '⏳', color: 'red' }
-        ];
-      
-      default:
-        return [];
-    }
-  };
-
-  const getQuickActions = () => {
-    const actions = [];
-    
-    if (['admin', 'dosen', 'mahasiswa'].includes(user?.role)) {
-      actions.push({
-        label: 'Create Proposal',
-        icon: '📝',
-        action: () => console.log('Navigate to create proposal'),
-        color: 'primary'
-      });
-    }
-    
-    if (['admin', 'reviewer', 'dosen'].includes(user?.role)) {
-      actions.push({
-        label: 'Review Proposals',
-        icon: '📋',
-        action: () => console.log('Navigate to reviews'),
-        color: 'secondary'
-      });
-    }
-    
-    if (user?.role === 'admin') {
-      actions.push({
-        label: 'Manage Users',
-        icon: '👥',
-        action: () => console.log('Navigate to user management'),
-        color: 'info'
-      });
-      actions.push({
-        label: 'Manage Skema',
-        icon: '⚙️',
-        action: () => console.log('Navigate to skema management'),
-        color: 'warning'
-      });
-    }
-    
-    actions.push({
-      label: 'View Profile',
-      icon: '👤',
-      action: () => console.log('Navigate to profile'),
-      color: 'light'
-    });
-    
-    return actions;
-  };
-
-  const getRoleDisplayName = (role) => {
-    const roleNames = {
-      admin: 'Administrator',
-      dosen: 'Dosen',
-      mahasiswa: 'Mahasiswa',
-      reviewer: 'Reviewer'
+        const response = await dashboardService.getDashboardData();
+        
+        clearTimeout(timeoutId);
+        
+        if (response && response.data) {
+          setDashboardData(response.data);
+        } else {
+          // Set default data if no response
+          setDashboardData({
+            stats: {
+              totalProposals: 0,
+              pendingReviews: 0,
+              totalUsers: 0,
+              totalSkema: 0
+            },
+            recentItems: [],
+            announcements: []
+          });
+        }
+      } catch (err) {
+        console.error('Dashboard fetch error:', err);
+        setError(err.message || 'Gagal memuat data dashboard');
+        
+        // Set fallback data on error
+        setDashboardData({
+          stats: {
+            totalProposals: 0,
+            pendingReviews: 0,
+            totalUsers: 0,
+            totalSkema: 0
+          },
+          recentItems: [],
+          announcements: []
+        });
+      } finally {
+        setLoading(false);
+      }
     };
-    return roleNames[role] || role;
-  };
+
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  // Show loading only for first 3 seconds, then show error or fallback
+  useEffect(() => {
+    const maxLoadingTime = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        setError('Data tidak dapat dimuat. Menampilkan data default.');
+        setDashboardData({
+          stats: {
+            totalProposals: 0,
+            pendingReviews: 0,
+            totalUsers: 0,
+            totalSkema: 0
+          },
+          recentItems: [],
+          announcements: []
+        });
+      }
+    }, 3000);
+
+    return () => clearTimeout(maxLoadingTime);
+  }, [loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loading />
+          <p className="mt-4 text-gray-600">Memuat dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="dashboard-container">
-      {/* Header Section */}
-      <div className="dashboard-header">
-        <div className="welcome-section">
-          <h1 className="welcome-title">
-            Selamat datang, {user?.name || 'User'}!
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Dashboard
           </h1>
-          <p className="welcome-subtitle">
-            Selamat datang di sistem P3M Polimdo
+          <p className="text-gray-600">
+            Selamat datang, {user?.name || 'User'}
           </p>
         </div>
-        <div className="user-info-card">
-          <div className="user-avatar">
-            <span className="avatar-icon">👤</span>
-          </div>
-          <div className="user-details">
-            <div className="user-name">{user?.name || 'User'}</div>
-            <div className="user-role">
-              <span className={`role-badge role-${user?.role}`}>
-                {getRoleDisplayName(user?.role)}
-              </span>
-            </div>
-            <div className="user-email">{user?.email}</div>
-            {user?.fakultas && (
-              <div className="user-fakultas">Fakultas: {user.fakultas}</div>
-            )}
-            {user?.prodi && (
-              <div className="user-prodi">Program Studi: {user.prodi}</div>
-            )}
-          </div>
-          <button 
-            className="logout-btn"
-            onClick={handleLogout}
-            type="button"
-          >
-            Logout
-          </button>
-        </div>
       </div>
 
-      {/* Stats Section */}
-      {getDashboardStats().length > 0 && (
-        <div className="stats-section">
-          <h2 className="section-title">Dashboard Overview</h2>
-          <div className="stats-grid">
-            {getDashboardStats().map((stat, index) => (
-              <StatsCard
-                key={index}
-                title={stat.title}
-                value={stat.value}
-                icon={stat.icon}
-                color={stat.color}
-              />
-            ))}
-          </div>
-        </div>
+      {error && (
+        <AlertMessage 
+          type="warning" 
+          message={error}
+          onClose={() => setError(null)}
+        />
       )}
 
-      {/* Quick Actions Section */}
-      <div className="quick-actions-section">
-        <h2 className="section-title">Quick Actions</h2>
-        <div className="quick-actions-grid">
-          {getQuickActions().map((action, index) => (
-            <button
-              key={index}
-              className={`quick-action-btn btn-${action.color}`}
-              onClick={action.action}
-              type="button"
-            >
-              <span className="action-icon">{action.icon}</span>
-              <span className="action-label">{action.label}</span>
-            </button>
-          ))}
-        </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard
+          title="Total Proposal"
+          value={dashboardData?.stats?.totalProposals || 0}
+          icon="📄"
+          color="blue"
+        />
+        <StatsCard
+          title="Review Pending"
+          value={dashboardData?.stats?.pendingReviews || 0}
+          icon="⏳"
+          color="yellow"
+        />
+        <StatsCard
+          title="Total Users"
+          value={dashboardData?.stats?.totalUsers || 0}
+          icon="👥"
+          color="green"
+        />
+        <StatsCard
+          title="Total Skema"
+          value={dashboardData?.stats?.totalSkema || 0}
+          icon="📋"
+          color="purple"
+        />
       </div>
 
-      {/* Recent Activity Section */}
-      <div className="recent-activity-section">
-        <h2 className="section-title">Recent Activity</h2>
-        <div className="activity-card">
-          <div className="activity-item">
-            <div className="activity-icon">📝</div>
-            <div className="activity-content">
-              <div className="activity-title">New proposal submitted</div>
-              <div className="activity-time">2 hours ago</div>
-            </div>
-          </div>
-          <div className="activity-item">
-            <div className="activity-icon">✅</div>
-            <div className="activity-content">
-              <div className="activity-title">Review completed</div>
-              <div className="activity-time">1 day ago</div>
-            </div>
-          </div>
-          <div className="activity-item">
-            <div className="activity-icon">👥</div>
-            <div className="activity-content">
-              <div className="activity-title">New user registered</div>
-              <div className="activity-time">2 days ago</div>
-            </div>
-          </div>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <RecentItems 
+            items={dashboardData?.recentItems || []}
+            loading={false}
+          />
+        </div>
+        <div>
+          <QuickActions userRole={user?.role} />
         </div>
       </div>
     </div>

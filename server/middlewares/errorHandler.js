@@ -83,6 +83,15 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  if (err instanceof multer.MulterError) {
+  return res.status(400).json({
+    success: false,
+    message: err.message || 'Upload error',
+    timestamp: new Date().toISOString()
+  });
+}
+
+
   // Validation errors
   if (err.name === 'ValidationError') {
     return res.status(422).json({

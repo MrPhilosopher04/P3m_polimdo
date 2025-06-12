@@ -1,0 +1,40 @@
+# ========================
+# GLOBAL IGNORE
+# ========================
+.DS_Store
+Thumbs.db
+*.log
+*.env
+.env
+.vscode/
+.idea/
+node_modules/
+dist/
+build/
+
+# ========================
+# CLIENT
+# ========================
+client/node_modules/
+client/.env
+client/.DS_Store
+client/build/
+client/dist/
+client/.cache/
+client/coverage/
+client/.next/
+client/.turbo/
+
+# ========================
+# SERVER
+# ========================
+server/node_modules/
+server/.env
+server/logs/
+server/uploads/
+server/.DS_Store
+server/coverage/
+server/.cache/
+server/.next/
+server/temp/
+server/pids/

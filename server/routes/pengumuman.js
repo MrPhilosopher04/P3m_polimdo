@@ -1,6 +1,6 @@
 const express = require('express');
 const pengumumanController = require('../controllers/pengumuman.controller');
-const { authMiddleware, authorize } = require('../middlewares/auth');
+const { verifyToken, checkRole } = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -9,9 +9,9 @@ router.get('/', pengumumanController.getAll);
 router.get('/:id', pengumumanController.getById);
 
 // Protected routes - Admin only
-router.post('/', authMiddleware, authorize(['ADMIN']), pengumumanController.create);
-router.put('/:id', authMiddleware, authorize(['ADMIN']), pengumumanController.update);
-router.delete('/:id', authMiddleware, authorize(['ADMIN']), pengumumanController.delete);
-router.patch('/:id/status', authMiddleware, authorize(['ADMIN']), pengumumanController.updateStatus);
+router.post('/', verifyToken, checkRole('ADMIN'), pengumumanController.create);
+router.put('/:id', verifyToken, checkRole('ADMIN'), pengumumanController.update);
+router.delete('/:id', verifyToken, checkRole('ADMIN'), pengumumanController.delete);
+router.patch('/:id/status', verifyToken, checkRole('ADMIN'), pengumumanController.updateStatus);
 
 module.exports = router;

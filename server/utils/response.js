@@ -1,3 +1,6 @@
+// server/utils/response.js
+
+// Kirim respon sukses
 const sendSuccess = (res, message = 'Success', data = null, statusCode = 200) => {
   const response = {
     success: true,
@@ -10,6 +13,7 @@ const sendSuccess = (res, message = 'Success', data = null, statusCode = 200) =>
   return res.status(statusCode).json(response);
 };
 
+// Kirim respon error
 const sendError = (res, message = 'An error occurred', statusCode = 500, errors = null) => {
   const response = {
     success: false,
@@ -17,7 +21,7 @@ const sendError = (res, message = 'An error occurred', statusCode = 500, errors 
     timestamp: new Date().toISOString()
   };
 
-  // Show full error details only in development mode
+  // Tampilkan detail error hanya jika mode development
   if (errors && process.env.NODE_ENV === 'development') {
     response.errors = errors;
   }
@@ -25,20 +29,29 @@ const sendError = (res, message = 'An error occurred', statusCode = 500, errors 
   return res.status(statusCode).json(response);
 };
 
-const sendPaginated = (res, message = 'Success', data = [], pagination = {}) => {
-  const totalPages = Math.ceil(pagination.total / pagination.limit || 1);
+// Kirim respon paginasi
+const sendPaginated = (
+  res,
+  message = 'Success',
+  data = [],
+  pagination = {}
+) => {
+  const page = pagination.page || 1;
+  const limit = pagination.limit || 10;
+  const total = pagination.total || 0;
+  const totalPages = Math.ceil(total / limit) || 1;
 
   const response = {
     success: true,
     message,
-    data,
+    data: { items: data }, // Konsistensi struktur data
     pagination: {
-      page: pagination.page || 1,
-      limit: pagination.limit || 10,
-      total: pagination.total || 0,
+      page,
+      limit,
+      total,
       pages: totalPages,
-      hasNext: (pagination.page || 1) < totalPages,
-      hasPrev: (pagination.page || 1) > 1
+      hasNext: page < totalPages,
+      hasPrev: page > 1
     },
     timestamp: new Date().toISOString()
   };
@@ -46,12 +59,15 @@ const sendPaginated = (res, message = 'Success', data = [], pagination = {}) => 
   return res.status(200).json(response);
 };
 
-// PERBAIKAN: Tambahkan alias untuk backward compatibility
+// Alias untuk backward compatibility
 const sendResponse = sendSuccess;
 
 module.exports = {
   sendSuccess,
   sendError,
   sendPaginated,
-  sendResponse // Alias untuk compatibility
+  sendResponse,
+  successResponse: sendSuccess,   // Tambahkan ini
+  errorResponse: sendError,   
+
 };

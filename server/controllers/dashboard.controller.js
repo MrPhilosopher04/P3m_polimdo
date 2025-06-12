@@ -1,248 +1,352 @@
-// server/controllers/dashboard.controller.js
+//server/controllers/dashboard.controller.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { sendSuccess, sendError } = require('../utils/response');
 
 const dashboardController = {
-  // Endpoint: GET /dashboard/stats
-  getStats: async (req, res) => {
+  // Get dashboard stats
+  async getDashboardStats(req, res) {
     try {
-      const userId = req.user.id;
-      const userRole = req.user.role;
-
+      const { role } = req.user;
       let stats = {};
 
-      if (userRole === 'ADMIN') {
-        const [
-          totalProposals,
-          pendingReviews,
-          approvedProposals,
-          rejectedProposals,
-          totalUsers,
-          activeSkemas,
-          recentProposals
-        ] = await Promise.all([
-          prisma.proposal.count(),
-          prisma.proposal.count({ where: { status: 'SUBMITTED' } }),
-          prisma.proposal.count({ where: { status: 'APPROVED' } }),
-          prisma.proposal.count({ where: { status: 'REJECTED' } }),
-          prisma.user.count({ where: { status: 'AKTIF' } }),
-          prisma.skema.count({ where: { status: 'AKTIF' } }),
-          prisma.proposal.findMany({
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              ketua: { select: { nama: true } },
-              skema: { select: { nama: true } }
-            }
-          })
-        ]);
-
-        stats = {
-          totalProposals,
-          pendingReviews,
-          approvedProposals,
-          rejectedProposals,
-          totalUsers,
-          activeSkemas,
-          recentProposals
-        };
-
-      } else if (userRole.includes('REVIEWER')) {
-        const [
-          assignedProposals,
-          completedReviews,
-          pendingReviews,
-          recentAssignments
-        ] = await Promise.all([
-          prisma.proposal.count({ where: { reviewerId: userId } }),
-          prisma.review.count({
-            where: {
-              reviewerId: userId,
-              is_final: true
-            }
-          }),
-          prisma.proposal.count({
-            where: {
-              reviewerId: userId,
-              status: 'REVIEW'
-            }
-          }),
-          prisma.proposal.findMany({
-            where: { reviewerId: userId },
-            take: 5,
-            orderBy: { tanggal_submit: 'desc' },
-            include: {
-              ketua: { select: { nama: true } },
-              skema: { select: { nama: true } }
-            }
-          })
-        ]);
-
-        stats = {
-          assignedProposals,
-          completedReviews,
-          pendingReviews,
-          recentAssignments
-        };
-
-      } else {
-        const [
-          myProposals,
-          draftProposals,
-          submittedProposals,
-          approvedProposals,
-          recentProposals
-        ] = await Promise.all([
-          prisma.proposal.count({
-            where: {
-              OR: [
-                { ketuaId: userId },
-                { members: { some: { userId } } }
-              ]
-            }
-          }),
-          prisma.proposal.count({
-            where: {
-              ketuaId: userId,
-              status: 'DRAFT'
-            }
-          }),
-          prisma.proposal.count({
-            where: {
-              OR: [
-                { ketuaId: userId },
-                { members: { some: { userId } } }
-              ],
-              status: { in: ['SUBMITTED', 'REVIEW'] }
-            }
-          }),
-          prisma.proposal.count({
-            where: {
-              OR: [
-                { ketuaId: userId },
-                { members: { some: { userId } } }
-              ],
-              status: 'APPROVED'
-            }
-          }),
-          prisma.proposal.findMany({
-            where: {
-              OR: [
-                { ketuaId: userId },
-                { members: { some: { userId } } }
-              ]
-            },
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              skema: { select: { nama: true } },
-              ketua: { select: { nama: true } }
-            }
-          })
-        ]);
-
-        stats = {
-          myProposals,
-          draftProposals,
-          submittedProposals,
-          approvedProposals,
-          recentProposals
-        };
+      switch (role) {
+        case 'ADMIN':
+          stats = await getAdminStats();
+          break;
+        case 'DOSEN':
+          stats = await getDosenStats(req.user.id);
+          break;
+        case 'MAHASISWA':
+          stats = await getMahasiswaStats(req.user.id);
+          break;
+        case 'REVIEWER':
+          stats = await getReviewerStats(req.user.id);
+          break;
+        default:
+          stats = await getDefaultStats();
       }
 
-      res.json({
-        success: true,
-        data: { stats }
-      });
-
+      return sendSuccess(res, 'Dashboard data berhasil dimuat', stats);
     } catch (error) {
-      console.error('Get dashboard stats error:', error.message);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+      console.error('Dashboard Error:', error);
+      return sendError(res, 'Gagal memuat data dashboard', 500);
     }
   },
 
-  // Endpoint: GET /dashboard/charts
-  getCharts: async (req, res) => {
+  // Get recent proposals
+  async getRecentProposals(req, res) {
     try {
-      let { year } = req.query;
-      year = parseInt(year) || new Date().getFullYear();
+      const limit = parseInt(req.query.limit) || 5;
+      const { role, id: userId } = req.user;
 
-      if (isNaN(year)) {
-        return res.status(400).json({ success: false, message: 'Invalid year parameter' });
+      let whereClause = {};
+      if (role !== 'ADMIN') {
+        whereClause = { ketuaId: userId };
       }
 
-      const proposalsByMonth = await prisma.$queryRaw`
-        SELECT 
-          MONTH(createdAt) as month,
-          COUNT(*) as count
-        FROM proposals 
-        WHERE YEAR(createdAt) = ${year}
-        GROUP BY MONTH(createdAt)
-        ORDER BY month
-      `;
-
-      const proposalsByStatus = await prisma.proposal.groupBy({
-        by: ['status'],
-        _count: { status: true },
-        where: {
-          createdAt: {
-            gte: new Date(`${year}-01-01`),
-            lt: new Date(`${year + 1}-01-01`)
+      const proposals = await prisma.proposal.findMany({
+        where: whereClause,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          ketua: {
+            select: { nama: true, email: true }
+          },
+          skema: {
+            select: { nama: true, kategori: true }
           }
         }
       });
 
-      const proposalsBySkema = await prisma.proposal.groupBy({
-        by: ['skemaId'],
-        _count: { skemaId: true },
-        where: {
-          createdAt: {
-            gte: new Date(`${year}-01-01`),
-            lt: new Date(`${year + 1}-01-01`)
-          }
-        }
-      });
-
-      const skemas = await prisma.skema.findMany({
-        select: { id: true, nama: true }
-      });
-
-      const skemaMap = skemas.reduce((acc, skema) => {
-        acc[skema.id] = skema.nama;
-        return acc;
-      }, {});
-
-      res.json({
-        success: true,
-        data: {
-          proposalsByMonth: proposalsByMonth.map(item => ({
-            month: item.month,
-            count: Number(item.count)
-          })),
-          proposalsByStatus: proposalsByStatus.map(item => ({
-            status: item.status,
-            count: item._count.status
-          })),
-          proposalsBySkema: proposalsBySkema.map(item => ({
-            skema: skemaMap[item.skemaId] || 'Unknown',
-            count: item._count.skemaId
-          }))
-        }
-      });
-
+      return sendSuccess(res, 'Recent proposals berhasil dimuat', proposals);
     } catch (error) {
-      console.error('Get charts data error:', error.message);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+      console.error('Recent Proposals Error:', error);
+      return sendError(res, 'Gagal memuat recent proposals', 500);
+    }
+  },
+
+  // Get recent users (Admin only)
+  async getRecentUsers(req, res) {
+    try {
+      if (req.user.role !== 'ADMIN') {
+        return sendError(res, 'Akses ditolak', 403);
+      }
+
+      const limit = parseInt(req.query.limit) || 5;
+
+      const users = await prisma.user.findMany({
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          nama: true,
+          email: true,
+          role: true,
+          status: true,
+          createdAt: true
+        }
       });
+
+      return sendSuccess(res, 'Recent users berhasil dimuat', users);
+    } catch (error) {
+      console.error('Recent Users Error:', error);
+      return sendError(res, 'Gagal memuat recent users', 500);
+    }
+  },
+
+  // Get recent reviews
+async getRecentReviews(req, res) {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = parseInt(req.query.skip) || 0; // ✅ tambahkan ini
+
+    const { role, id: userId } = req.user;
+
+    let whereClause = {}; // ✅ sudah benar
+    if (role === 'REVIEWER') {
+      whereClause = { reviewerId: userId };
+    }
+
+    const reviews = await prisma.review.findMany({
+      skip: skip, // ✅ sekarang variabelnya valid
+      take: limit,
+      where: whereClause, // ✅ gunakan 'whereClause', bukan 'where'
+      include: {
+        proposal: {
+          select: {
+            id: true,
+            judul: true,
+            status: true,
+            ketua: { select: { nama: true, email: true } },
+            skema: { select: { nama: true } }
+          }
+        },
+        reviewer: {
+          select: { nama: true, email: true }
+        }
+      },
+      orderBy: { tanggal_review: 'desc' }
+    });
+
+    return sendSuccess(res, 'Recent reviews berhasil dimuat', reviews);
+  } catch (error) {
+    console.error('Recent Reviews Error:', error);
+    return sendError(res, 'Gagal memuat recent reviews', 500);
+  }
+},
+
+  // Get announcements
+  async getAnnouncements(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 3;
+
+      const announcements = await prisma.pengumuman.findMany({
+        where: { status: 'AKTIF' },
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return sendSuccess(res, 'Announcements berhasil dimuat', announcements);
+    } catch (error) {
+      console.error('Announcements Error:', error);
+      return sendError(res, 'Gagal memuat announcements', 500);
+    }
+  },
+
+  // Get system health (Admin only)
+  async getSystemHealth(req, res) {
+    try {
+      if (req.user.role !== 'ADMIN') {
+        return sendError(res, 'Akses ditolak', 403);
+      }
+
+      const health = {
+        database: 'connected',
+        server: 'running',
+        memory: process.memoryUsage(),
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      };
+
+      return sendSuccess(res, 'System health berhasil dimuat', health);
+    } catch (error) {
+      console.error('System Health Error:', error);
+      return sendError(res, 'Gagal memuat system health', 500);
+    }
+  },
+
+  // Get activity logs (Admin only)
+  async getActivityLogs(req, res) {
+    try {
+      if (req.user.role !== 'ADMIN') {
+        return sendError(res, 'Akses ditolak', 403);
+      }
+
+      const limit = parseInt(req.query.limit) || 10;
+
+      // Menggunakan proposal sebagai log aktivitas sederhana
+      const activities = await prisma.proposal.findMany({
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          judul: true,
+          status: true,
+          updatedAt: true,
+          ketua: {
+            select: { nama: true }
+          }
+        }
+      });
+
+      return sendSuccess(res, 'Activity logs berhasil dimuat', activities);
+    } catch (error) {
+      console.error('Activity Logs Error:', error);
+      return sendError(res, 'Gagal memuat activity logs', 500);
     }
   }
 };
+
+// Helper functions
+async function getAdminStats() {
+  try {
+    const [
+      totalProposals,
+      totalUsers,
+      totalReviews,
+      totalSkema,
+      pendingProposals,
+      approvedProposals,
+      rejectedProposals,
+      activeUsers
+    ] = await Promise.all([
+      prisma.proposal.count(),
+      prisma.user.count(),
+      prisma.review.count(),
+      prisma.skema.count(),
+      prisma.proposal.count({ where: { status: 'SUBMITTED' } }),
+      prisma.proposal.count({ where: { status: 'APPROVED' } }),
+      prisma.proposal.count({ where: { status: 'REJECTED' } }),
+      prisma.user.count({ where: { status: 'AKTIF' } })
+    ]);
+
+    return {
+      totalProposals,
+      totalUsers,
+      totalReviews,
+      totalSkema,
+      pendingProposals,
+      approvedProposals,
+      rejectedProposals,
+      activeUsers
+    };
+  } catch (error) {
+    console.error('Admin Stats Error:', error);
+    return getDefaultStats();
+  }
+}
+
+async function getDosenStats(userId) {
+  try {
+    const [
+      myProposals,
+      pendingProposals,
+      approvedProposals,
+      rejectedProposals
+    ] = await Promise.all([
+      prisma.proposal.count({ where: { ketuaId: userId } }),
+      prisma.proposal.count({ where: { ketuaId: userId, status: 'SUBMITTED' } }),
+      prisma.proposal.count({ where: { ketuaId: userId, status: 'APPROVED' } }),
+      prisma.proposal.count({ where: { ketuaId: userId, status: 'REJECTED' } })
+    ]);
+
+    return {
+      myProposals,
+      pendingProposals,
+      approvedProposals,
+      rejectedProposals
+    };
+  } catch (error) {
+    console.error('Dosen Stats Error:', error);
+    return getDefaultStats();
+  }
+}
+
+async function getMahasiswaStats(userId) {
+  try {
+    const [
+      myProposals,
+      pendingProposals,
+      approvedProposals,
+      totalSkema  // TAMBAHKAN QUERY UNTUK SKEMA AKTIF
+    ] = await Promise.all([
+      prisma.proposal.count({ where: { ketuaId: userId } }),
+      prisma.proposal.count({ where: { ketuaId: userId, status: 'SUBMITTED' } }),
+      prisma.proposal.count({ where: { ketuaId: userId, status: 'APPROVED' } }),
+      // QUERY UNTUK SKEMA AKTIF
+      prisma.skema.count({ 
+        where: { 
+          status: 'AKTIF',
+          OR: [
+            { tanggal_tutup: null },
+            { tanggal_tutup: { gte: new Date() } }
+          ]
+        }
+      })
+    ]);
+
+    return {
+      myProposals,
+      pendingProposals,
+      approvedProposals,
+      totalSkema  // RETURN DATA SKEMA
+    };
+  } catch (error) {
+    console.error('Mahasiswa Stats Error:', error);
+    return {
+      myProposals: 0,
+      pendingProposals: 0,
+      approvedProposals: 0,
+      totalSkema: 0  // FALLBACK VALUE
+    };
+  }
+}
+
+async function getReviewerStats(userId) {
+  try {
+    const [
+      myReviews,
+      pendingReviews,
+      completedReviews
+    ] = await Promise.all([
+      prisma.review.count({ where: { reviewerId: userId } }),
+      prisma.proposal.count({ where: { reviewerId: userId, status: 'REVIEW' } }),
+      prisma.review.count({ where: { reviewerId: userId } })
+    ]);
+
+    return {
+      myReviews,
+      pendingReviews,
+      completedReviews
+    };
+  } catch (error) {
+    console.error('Reviewer Stats Error:', error);
+    return getDefaultStats();
+  }
+}
+
+function getDefaultStats() {
+  return {
+    totalProposals: 0,
+    totalUsers: 0,
+    totalReviews: 0,
+    totalSkema: 0,
+    pendingProposals: 0,
+    approvedProposals: 0,
+    rejectedProposals: 0,
+    activeUsers: 0
+  };
+}
 
 module.exports = dashboardController;

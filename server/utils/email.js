@@ -1,30 +1,35 @@
 const nodemailer = require('nodemailer');
 
-// Transporter config
 const transporter = nodemailer.createTransport({
-  service: 'Gmail',
+  host: 'smtp.gmail.com',  // opsi alternatif selain service: 'Gmail'
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
 
-/**
- * Mengirim email
- * @param {Object} options - { to, subject, html/text }
- */
 const sendEmail = async ({ to, subject, html, text }) => {
+  if (!to || !subject) {
+    throw new Error('Email "to" and "subject" are required.');
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"P3M POLIMDO" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     text,
     html,
   };
 
-  return transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    return info;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
 };
 
-module.exports = {
-  sendEmail,
-};
+module.exports = { sendEmail };

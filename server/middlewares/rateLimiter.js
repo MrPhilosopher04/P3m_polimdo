@@ -1,3 +1,4 @@
+//server/middlewares/rateLimiter.js
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter untuk authentication endpoints

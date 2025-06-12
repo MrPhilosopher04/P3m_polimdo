@@ -33,7 +33,7 @@ export const getStatusText = (status) => {
   const texts = {
     draft: 'Draft',
     submitted: 'Disubmit',
-    under_review: 'Sedang Direview',
+    review: 'Sedang Direview',
     approved: 'Disetujui',
     rejected: 'Ditolak',
     revision: 'Perlu Revisi'

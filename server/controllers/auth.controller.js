@@ -1,55 +1,37 @@
-//server/controllers/auth.controller.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 const { sendResponse, sendError } = require('../utils/response');
 const { validateEmail, validatePhoneNumber } = require('../utils/validator');
-const { USER_ROLES } = require('../utils/constants');
+const { USER_ROLES, STATUS } = require('../utils/constants');
 
 const authController = {
   login: async (req, res) => {
     try {
       const { email, password } = req.body;
 
-      // Validasi input
       if (!email || !password) {
         return sendError(res, 'Email dan password wajib diisi', 400);
       }
-      
+
       if (!validateEmail(email)) {
         return sendError(res, 'Format email tidak valid', 400);
       }
 
-      const user = await prisma.user.findUnique({
-        where: { email },
-        include: {
-          jurusan: true,
-          prodi: true
-        }
-      });
+      const user = await prisma.user.findUnique({ where: { email } });
 
-      if (!user) {
+      if (!user || !(await bcrypt.compare(password, user.password))) {
         return sendError(res, 'Email atau password salah', 401);
       }
 
-      if (!user.password) {
-        return sendError(res, 'Akun ini tidak menggunakan password. Silakan gunakan metode login lain.', 401);
-      }
-
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return sendError(res, 'Email atau password salah', 401);
-      }
-
-      if (user.status !== 'AKTIF') {
+      if (user.status !== STATUS.AKTIF) {
         return sendError(res, 'Akun tidak aktif', 403);
       }
 
       const token = jwt.sign(
-        { 
-          userId: user.id, 
-          email: user.email, 
+        {
+          id: user.id,
+          email: user.email,
           role: user.role,
           nama: user.nama
         },
@@ -57,13 +39,9 @@ const authController = {
         { expiresIn: '24h' }
       );
 
-      // Buang password dan field sensitif
       const { password: _, ...safeUser } = user;
 
-      sendResponse(res, 'Login berhasil', { 
-        user: safeUser, 
-        token 
-      });
+      sendResponse(res, 'Login berhasil', { user: safeUser, token });
     } catch (error) {
       console.error('Login error:', error);
       sendError(res, 'Terjadi kesalahan server', 500);
@@ -73,7 +51,7 @@ const authController = {
   profile: async (req, res) => {
     try {
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id }, // Diubah menjadi req.user.id
+        where: { id: req.user.id },
         select: {
           id: true,
           nip: true,
@@ -82,15 +60,12 @@ const authController = {
           email: true,
           role: true,
           no_telp: true,
-          no_rek: true,
           id_sinta: true,
           status: true,
-          createdAt: true,
-          jurusan: true,
-          prodi: true,
           bidang_keahlian: true,
-          institusi: true,
-          jurusan: true
+          jurusan: true,
+          createdAt: true,
+          updatedAt: true
         }
       });
 
@@ -107,39 +82,33 @@ const authController = {
 
   updateProfile: async (req, res) => {
     try {
-      const { 
-        nama, 
-        no_telp, 
-        no_rek, 
+      const {
+        nama,
+        no_telp,
         id_sinta,
         bidang_keahlian,
-        institusi,
         jurusan
       } = req.body;
-      
-      // Validasi minimal
+
       if (!nama) {
         return sendError(res, 'Nama wajib diisi', 400);
       }
-      
-      // Validasi nomor telepon jika ada
+
       if (no_telp && !validatePhoneNumber(no_telp)) {
         return sendError(res, 'Format nomor telepon tidak valid', 400);
       }
 
-      // Data yang akan diupdate
       const updateData = {
         nama,
         no_telp: no_telp || null,
-        no_rek: no_rek || null,
         id_sinta: id_sinta || null,
         bidang_keahlian: bidang_keahlian || null,
-        institusi: institusi || null,
-        jurusan: jurusan || null
+        
+        jurusanId: jurusan || null
       };
 
       const updatedUser = await prisma.user.update({
-        where: { id: req.user.id }, // Diubah menjadi req.user.id
+        where: { id: req.user.id },
         data: updateData,
         select: {
           id: true,
@@ -149,11 +118,10 @@ const authController = {
           email: true,
           role: true,
           no_telp: true,
-          no_rek: true,
           id_sinta: true,
           status: true,
           bidang_keahlian: true,
-          institusi: true,
+          
           jurusan: true
         }
       });
@@ -161,11 +129,9 @@ const authController = {
       sendResponse(res, 'Profil berhasil diperbarui', { user: updatedUser });
     } catch (error) {
       console.error('Update profile error:', error);
-      
       if (error.code === 'P2025') {
         return sendError(res, 'User tidak ditemukan', 404);
       }
-      
       sendError(res, 'Terjadi kesalahan server', 500);
     }
   },
@@ -182,27 +148,19 @@ const authController = {
         return sendError(res, 'Password baru dan konfirmasi password tidak cocok', 400);
       }
 
-      const user = await prisma.user.findUnique({ 
-        where: { id: req.user.id } // Diubah menjadi req.user.id
-      });
+      if (newPassword.length < 8) {
+        return sendError(res, 'Password minimal 8 karakter', 400);
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
 
       if (!user) {
         return sendError(res, 'User tidak ditemukan', 404);
       }
 
-      // Validasi untuk akun tanpa password (SSO)
-      if (!user.password) {
-        return sendError(res, 'Akun ini tidak menggunakan password', 400);
-      }
-
       const isValidPassword = await bcrypt.compare(currentPassword, user.password);
       if (!isValidPassword) {
         return sendError(res, 'Password saat ini salah', 400);
-      }
-
-      // Validasi kekuatan password
-      if (newPassword.length < 6) {
-        return sendError(res, 'Password minimal 6 karakter', 400);
       }
 
       const hashedNewPassword = await bcrypt.hash(newPassword, 10);
@@ -215,11 +173,13 @@ const authController = {
       sendResponse(res, 'Password berhasil diubah');
     } catch (error) {
       console.error('Change password error:', error);
+      if (error.code === 'P2025') {
+        return sendError(res, 'User tidak ditemukan', 404);
+      }
       sendError(res, 'Terjadi kesalahan server', 500);
     }
   },
 
-  // Tambahkan endpoint untuk deaktivasi akun
   deactivateAccount: async (req, res) => {
     try {
       const { password } = req.body;
@@ -228,9 +188,7 @@ const authController = {
         return sendError(res, 'Password wajib diisi', 400);
       }
 
-      const user = await prisma.user.findUnique({ 
-        where: { id: req.user.id } 
-      });
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
 
       if (!user) {
         return sendError(res, 'User tidak ditemukan', 404);
@@ -243,12 +201,15 @@ const authController = {
 
       await prisma.user.update({
         where: { id: req.user.id },
-        data: { status: 'NONAKTIF' }
+        data: { status: STATUS.NONAKTIF }
       });
 
       sendResponse(res, 'Akun berhasil dinonaktifkan');
     } catch (error) {
       console.error('Deactivate account error:', error);
+      if (error.code === 'P2025') {
+        return sendError(res, 'User tidak ditemukan', 404);
+      }
       sendError(res, 'Terjadi kesalahan server', 500);
     }
   }

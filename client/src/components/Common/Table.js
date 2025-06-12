@@ -1,36 +1,26 @@
-import React from 'react';
-
-const Table = ({ columns, data, onRowClick, loading = false }) => {
-  if (loading) {
-    return <div className="loading">Loading table data...</div>;
-  }
-
-  if (!data || data.length === 0) {
-    return <div className="no-data">Tidak ada data</div>;
-  }
-
+// client/src/components/Common/Table.js
+export const Table = ({ columns, data }) => {
   return (
-    <div className="table-container">
-      <table className="data-table">
-        <thead>
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
           <tr>
-            {columns.map((column, index) => (
-              <th key={index} className={column.className}>
-                {column.header}
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                {column.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
-          {data.map((row, rowIndex) => (
-            <tr 
-              key={rowIndex} 
-              onClick={() => onRowClick && onRowClick(row)}
-              className={onRowClick ? 'clickable' : ''}
-            >
-              {columns.map((column, colIndex) => (
-                <td key={colIndex} className={column.className}>
-                  {column.render ? column.render(row) : row[column.key]}
+        <tbody className="bg-white divide-y divide-gray-200">
+          {data.map((item, index) => (
+            <tr key={item.id || index} className="hover:bg-gray-50">
+              {columns.map((column) => (
+                <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm">
+                  {column.render ? column.render(item) : item[column.key]}
                 </td>
               ))}
             </tr>

@@ -1,86 +1,124 @@
-const fs = require('fs');
+const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
 
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../logs');
+// Log levels
+const LOG_LEVELS = {
+  ERROR: 'error',
+  WARN: 'warn',
+  INFO: 'info',
+  DEBUG: 'debug'
+};
+
+const fs = require('fs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Log levels
-const LOG_LEVELS = {
-  ERROR: 'ERROR',
-  WARN: 'WARN',
-  INFO: 'INFO',
-  DEBUG: 'DEBUG'
-};
 
-// Create log entry
-const createLogEntry = (level, message, meta = {}) => {
-  return {
-    timestamp: new Date().toISOString(),
-    level,
+// Create logs directory if it doesn't exist
+const logsDir = path.join(__dirname, '../../logs');
+
+// Winston formatters
+const { combine, timestamp, printf, errors } = winston.format;
+
+const logFormat = printf(({ level, message, timestamp, stack, ...meta }) => {
+  const baseLog = {
+    timestamp,
+    level: level.toUpperCase(),
     message,
-    meta,
-    pid: process.pid
+    pid: process.pid,
+    ...(meta.userId && { userId: meta.userId })
   };
-};
 
-// Write to log file
-const writeToFile = (filename, entry) => {
-  const logPath = path.join(logsDir, filename);
-  const logLine = JSON.stringify(entry) + '\n';
-  
-  fs.appendFile(logPath, logLine, (err) => {
-    if (err) console.error('Failed to write to log file:', err);
-  });
-};
-
-// Logger functions
-const logger = {
-  error: (message, meta = {}) => {
-    const entry = createLogEntry(LOG_LEVELS.ERROR, message, meta);
-    console.error(`[ERROR] ${message}`, meta);
-    writeToFile('error.log', entry);
-  },
-
-  warn: (message, meta = {}) => {
-    const entry = createLogEntry(LOG_LEVELS.WARN, message, meta);
-    console.warn(`[WARN] ${message}`, meta);
-    writeToFile('app.log', entry);
-  },
-
-  info: (message, meta = {}) => {
-    const entry = createLogEntry(LOG_LEVELS.INFO, message, meta);
-    console.log(`[INFO] ${message}`, meta);
-    writeToFile('app.log', entry);
-  },
-
-  debug: (message, meta = {}) => {
-    if (process.env.NODE_ENV === 'development') {
-      const entry = createLogEntry(LOG_LEVELS.DEBUG, message, meta);
-      console.debug(`[DEBUG] ${message}`, meta);
-      writeToFile('debug.log', entry);
-    }
+  if (stack) {
+    baseLog.stack = stack;
   }
-};
+
+  if (Object.keys(meta).length > 0) {
+    baseLog.meta = meta;
+  }
+
+  return JSON.stringify(baseLog);
+});
+
+// Logger instance
+const logger = winston.createLogger({
+  levels: {
+    error: 0,
+    warn: 1,
+    info: 2,
+    debug: 3
+  },
+  format: combine(
+    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    errors({ stack: true }),
+    logFormat
+  ),
+  transports: [
+    // Console transport (development only)
+    new winston.transports.Console({
+      level: 'debug',
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+
+    // Daily rotate for application logs
+    new DailyRotateFile({
+      level: 'info',
+      filename: path.join(logsDir, 'application-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '30d'
+    }),
+
+    // Daily rotate for error logs
+    new DailyRotateFile({
+      level: 'error',
+      filename: path.join(logsDir, 'error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '90d'
+    })
+  ],
+  exceptionHandlers: [
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'exceptions-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '30d'
+    })
+  ]
+});
+
+// Production environment settings
+if (process.env.NODE_ENV === 'production') {
+  logger.transports[0].level = 'info'; // Set console to info in prod
+}
 
 // HTTP request logger middleware
 const requestLogger = (req, res, next) => {
   const start = Date.now();
   
+  // Capture user ID if available
+  const userId = req.user?.id || null;
+
   // Log request
   logger.info('HTTP Request', {
     method: req.method,
     url: req.originalUrl,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    userId: req.user?.id
+    userId
   });
 
-  // Override res.end to log response
-  const originalEnd = res.end;
-  res.end = function(...args) {
+  // Log response when finished
+  res.on('finish', () => {
     const duration = Date.now() - start;
     
     logger.info('HTTP Response', {
@@ -88,15 +126,14 @@ const requestLogger = (req, res, next) => {
       url: req.originalUrl,
       statusCode: res.statusCode,
       duration: `${duration}ms`,
-      userId: req.user?.id
+      userId
     });
-
-    originalEnd.apply(res, args);
-  };
+  });
 
   next();
 };
 
+// Export logger instance directly
 module.exports = {
   logger,
   requestLogger,

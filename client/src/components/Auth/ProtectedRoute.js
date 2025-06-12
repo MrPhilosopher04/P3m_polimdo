@@ -1,5 +1,5 @@
 // src/components/Auth/ProtectedRoute.js
-import React from 'react';
+import React, { memo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -7,42 +7,40 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  // Show loading while checking authentication
+  // ✅ Show loading spinner while checking authentication
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner">Loading...</div>
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
+  // ✅ Redirect to login page if not authenticated
+  // Simpan current location untuk redirect kembali setelah login
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check role-based access
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return (
-      <div className="access-denied">
-        <h2>Akses Ditolak</h2>
-        <p>Anda tidak memiliki izin untuk mengakses halaman ini.</p>
-        <p>Role Anda: <strong>{user.role}</strong></p>
-        <p>Role yang diizinkan: <strong>{allowedRoles.join(', ')}</strong></p>
-      </div>
-    );
+  // ✅ Check role-based access
+  if (
+    allowedRoles.length > 0 &&
+    (!user || !allowedRoles.includes(user.role))
+  ) {
+    // Redirect ke halaman unauthorized atau dashboard
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 };
 
-// Higher-order component untuk role-specific routes
+// Higher-order component to wrap any component with role-based protection
 export const withRoleCheck = (Component, allowedRoles = []) => {
-  return (props) => (
+  return memo((props) => (
     <ProtectedRoute allowedRoles={allowedRoles}>
       <Component {...props} />
     </ProtectedRoute>
-  );
+  ));
 };
 
 export default ProtectedRoute;

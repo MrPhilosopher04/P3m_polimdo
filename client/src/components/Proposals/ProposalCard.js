@@ -1,64 +1,145 @@
+// client/src/components/Proposals/ProposalCard.js
 import React from 'react';
 import { Link } from 'react-router-dom';
+import ProposalStatus from './ProposalStatus';
 
-const ProposalCard = ({ proposal, userRole, onUpdate }) => {
-  const getStatusBadge = (status) => {
-    const badges = {
-      draft: { text: 'Draft', class: 'badge-draft' },
-      submitted: { text: 'Diajukan', class: 'badge-submitted' },
-      approved: { text: 'Disetujui', class: 'badge-approved' },
-      rejected: { text: 'Ditolak', class: 'badge-rejected' }
-    };
-    return badges[status] || badges.draft;
+const ProposalCard = ({ proposal, onDelete, canEdit, canDelete, userRole }) => {
+  const handleDelete = () => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus proposal ini?')) {
+      onDelete(proposal.id);
+    }
   };
 
-  const badge = getStatusBadge(proposal.status);
+  const formatCurrency = (amount) => {
+    if (!amount) return '-';
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   return (
-    <div className="proposal-card">
-      <div className="card-header">
-        <h3>{proposal.title}</h3>
-        <span className={`status-badge ${badge.class}`}>
-          {badge.text}
-        </span>
-      </div>
-      
-      <div className="card-body">
-        <p className="proposal-description">
-          {proposal.description?.substring(0, 100)}...
-        </p>
-        
-       <div className="proposal-meta">
-  <span>
-    <span role="img" aria-label="tanggal">📅</span> {new Date(proposal.createdAt).toLocaleDateString('id-ID')}
-  </span>
-  <span>
-    <span role="img" aria-label="pengguna">👤</span> {proposal.user?.name}
-  </span>
-  <span>
-    <span role="img" aria-label="skema">📋</span> {proposal.skema?.name}
-  </span>
-</div>
-
-      </div>
-      
-      <div className="card-actions">
-        <Link 
-          to={`/proposals/${proposal.id}`} 
-          className="btn btn-primary"
-        >
-          Lihat Detail
-        </Link>
-        
-        {(userRole === 'admin' || proposal.userId === proposal.currentUserId) && (
+    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex-1">
           <Link 
-            to={`/proposals/${proposal.id}/edit`} 
-            className="btn btn-secondary"
+            to={`/proposals/${proposal.id}`}
+            className="text-lg font-semibold text-gray-900 hover:text-blue-600 line-clamp-2"
           >
-            Edit
+            {proposal.judul}
           </Link>
-        )}
+          <p className="text-sm text-gray-500 mt-1">
+            {proposal.skema?.nama || 'Skema tidak tersedia'}
+          </p>
+        </div>
+        <ProposalStatus status={proposal.status} />
       </div>
+
+      {/* Content */}
+      <div className="mb-4">
+        <p className="text-gray-600 text-sm line-clamp-3">
+          {proposal.abstrak || 'Tidak ada abstrak'}
+        </p>
+      </div>
+
+      {/* Info */}
+      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+        <div>
+          <span className="text-gray-500">Ketua:</span>
+          <p className="font-medium">{proposal.ketua?.nama || 'Tidak tersedia'}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Tahun:</span>
+          <p className="font-medium">{proposal.tahun}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Dana Diusulkan:</span>
+          <p className="font-medium">{formatCurrency(proposal.dana_diusulkan)}</p>
+        </div>
+        <div>
+          <span className="text-gray-500">Anggota:</span>
+          <p className="font-medium">{proposal._count?.members || 0} orang</p>
+        </div>
+      </div>
+
+      {/* Keywords */}
+      {proposal.kata_kunci && (
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-1">
+            {proposal.kata_kunci.split(',').slice(0, 3).map((keyword, index) => (
+              <span
+                key={index}
+                className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
+              >
+                {keyword.trim()}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+        <span className="text-xs text-gray-500">
+          Dibuat: {formatDate(proposal.createdAt)}
+        </span>
+        
+        <div className="flex gap-2">
+          <Link
+            to={`/proposals/${proposal.id}`}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          >
+            Detail
+          </Link>
+          
+          {canEdit && (
+            <Link
+              to={`/proposals/${proposal.id}/edit`}
+              className="text-green-600 hover:text-green-800 text-sm font-medium"
+            >
+              Edit
+            </Link>
+          )}
+          
+          {canDelete && (
+            <button
+              onClick={handleDelete}
+              className="text-red-600 hover:text-red-800 text-sm font-medium"
+            >
+              Hapus
+            </button>
+          )}
+
+          {/* Submit button for draft proposals */}
+          {proposal.status === 'DRAFT' && canEdit && (
+            <button
+              onClick={() => window.location.href = `/proposals/${proposal.id}?action=submit`}
+              className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+            >
+              Ajukan
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Review info */}
+      {proposal.reviewer && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-500">
+            Reviewer: <span className="font-medium">{proposal.reviewer.nama}</span>
+          </p>
+        </div>
+      )}
     </div>
   );
 };
