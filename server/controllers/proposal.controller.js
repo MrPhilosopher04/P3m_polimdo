@@ -243,42 +243,55 @@ const proposalController = {
     }
   },
 
-  // SUBMIT
+    // SUBMIT PROPOSAL (Mahasiswa ketua, Dosen, Admin)
   submit: async (req, res) => {
+    console.log('>>> ENTER submit controller', req.params.id, req.user.role);
     try {
-      const { id } = req.params;
-
+      const id = parseInt(req.params.id, 10);
       const proposal = await prisma.proposal.findUnique({
-        where: { id: parseInt(id) },
-        include: { documents: true, members: true }
+        where: { id },
+        include: { members: true }
       });
-
       if (!proposal) return sendError(res, 'Proposal tidak ditemukan', 404);
 
-      const canSubmit =
-        proposal.ketuaId === req.user.id ||
-        proposal.members.some(m => m.userId === req.user.id);
-
-      if (!canSubmit && req.user.role !== 'ADMIN') {
-        return sendError(res, 'Akses ditolak', 403);
+      const isKetuaMahasiswa = (req.user.role === 'MAHASISWA' && proposal.ketuaId === req.user.id);
+      const isDosen =
+        req.user.role === 'DOSEN' &&
+        (
+          proposal.ketuaId === req.user.id || 
+          proposal.members.some(m => m.userId === req.user.id)
+        );
+      const isAdmin = req.user.role === 'ADMIN';
+      
+      // Hanya mahasiswa sebagai ketua, dosen, atau admin yang boleh mengajukan
+      if (!isKetuaMahasiswa && !isDosen && !isAdmin) {
+        return sendError(res, 'Anda tidak berhak mengajukan proposal ini', 403);
       }
 
+      // Cek status masih DRAFT
       if (proposal.status !== 'DRAFT') {
         return sendError(res, 'Proposal sudah diajukan sebelumnya', 400);
       }
 
+      // Update status ke SUBMITTED dan tanggal_submit
       const updated = await prisma.proposal.update({
-        where: { id: parseInt(id) },
+        where: { id },
         data: {
           status: 'SUBMITTED',
           tanggal_submit: new Date()
+        },
+        include: {
+          skema: true,
+          ketua: { select: { id: true, nama: true } },
+          reviewer: { select: { id: true, nama: true } },
+          _count: { select: { members: true, documents: true } }
         }
       });
 
-      sendResponse(res, 'Proposal berhasil diajukan', { proposal: updated });
+      return sendResponse(res, 'Proposal berhasil diajukan', { proposal: updated });
     } catch (error) {
       console.error('Submit proposal error:', error);
-      sendError(res, 'Terjadi kesalahan server', 500);
+      return sendError(res, 'Terjadi kesalahan server saat mengajukan proposal', 500);
     }
   },
 

@@ -109,11 +109,20 @@ const ProposalList = () => {
     }
   };
 
-  const canEdit = (proposal) => {
+    const handleStatusChange = (id, newStatus) => {
+    setProposals(prev =>
+      prev.map(p => (p.id === id ? { ...p, status: newStatus } : p))
+    );
+  };
+
+ const canEdit = proposal => {
     return (
       user.role === 'ADMIN' ||
-      proposal.ketuaId === user.id ||
-      proposal.members?.some((m) => m.userId === user.id)
+      (user.role === 'MAHASISWA' && proposal.ketuaId === user.id) ||
+      (user.role === 'DOSEN' && (
+        proposal.ketuaId === user.id ||
+        proposal.members?.some(m => m.userId === user.id)
+      ))
     );
   };
 
@@ -227,6 +236,7 @@ const ProposalList = () => {
               key={proposal.id}
               proposal={proposal}
               onDelete={handleDelete}
+               onStatusChange={handleStatusChange} 
               canEdit={canEdit(proposal)}
               canDelete={canDelete(proposal)}
               userRole={user.role}

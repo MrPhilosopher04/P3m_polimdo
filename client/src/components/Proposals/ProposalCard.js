@@ -1,12 +1,35 @@
 // client/src/components/Proposals/ProposalCard.js
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ProposalStatus from './ProposalStatus';
+import proposalService from '../../services/proposalService';
 
-const ProposalCard = ({ proposal, onDelete, canEdit, canDelete, userRole }) => {
+const ProposalCard = ({ proposal, onDelete, onStatusChange, canEdit, canDelete }) => {
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+
   const handleDelete = () => {
     if (window.confirm('Apakah Anda yakin ingin menghapus proposal ini?')) {
       onDelete(proposal.id);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (proposal.status !== 'DRAFT' || loadingSubmit) return;
+    if (!window.confirm('Ajukan proposal ini?')) return;
+
+    try {
+      setLoadingSubmit(true);
+      const result = await proposalService.submitProposal(proposal.id);
+      if (result.success) {
+        onStatusChange(proposal.id, 'SUBMITTED');
+      } else {
+        alert(result.error || 'Gagal mengajukan proposal');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Terjadi kesalahan saat mengajukan proposal');
+    } finally {
+      setLoadingSubmit(false);
     }
   };
 
@@ -23,7 +46,7 @@ const ProposalCard = ({ proposal, onDelete, canEdit, canDelete, userRole }) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
@@ -120,19 +143,18 @@ const ProposalCard = ({ proposal, onDelete, canEdit, canDelete, userRole }) => {
             </button>
           )}
 
-          {/* Submit button for draft proposals */}
           {proposal.status === 'DRAFT' && canEdit && (
             <button
-              onClick={() => window.location.href = `/proposals/${proposal.id}?action=submit`}
-              className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+              onClick={handleSubmit}
+              disabled={loadingSubmit}
+              className="text-purple-600 hover:text-purple-800 text-sm font-medium disabled:opacity-50"
             >
-              Ajukan
+              {loadingSubmit ? 'Mengajukan...' : 'Ajukan'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Review info */}
       {proposal.reviewer && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           <p className="text-xs text-gray-500">
